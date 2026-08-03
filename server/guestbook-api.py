@@ -306,6 +306,208 @@ def get_market_data():
         }
 
 
+# ============================================================
+#  Market V2 — 全球金融市场统一数据层
+#  数据源: Yahoo Finance (公开 API)
+#  缓存:   60s TTL，失败时保留最近成功数据
+# ============================================================
+MARKET_V2_TTL = 60
+_market_v2_cache = {
+    "data": None,
+    "updated_at": 0,
+    "updating": False,
+    "last_error": None
+}
+
+# 资产定义: symbol -> {name, type, yahoo_symbol}
+MARKET_V2_ASSETS = {
+    "NVDA":     {"name": "NVIDIA",          "type": "stock",      "yahoo": "NVDA"},
+    "AMD":      {"name": "AMD",             "type": "stock",      "yahoo": "AMD"},
+    "MSFT":     {"name": "Microsoft",       "type": "stock",      "yahoo": "MSFT"},
+    "GOOGL":    {"name": "Alphabet",        "type": "stock",      "yahoo": "GOOGL"},
+    "META":     {"name": "Meta",            "type": "stock",      "yahoo": "META"},
+    "AAPL":     {"name": "Apple",           "type": "stock",      "yahoo": "AAPL"},
+    "TSLA":     {"name": "Tesla",           "type": "stock",      "yahoo": "TSLA"},
+    "PLTR":     {"name": "Palantir",        "type": "stock",      "yahoo": "PLTR"},
+    "NASDAQ":   {"name": "NASDAQ Composite", "type": "index",     "yahoo": "^IXIC"},
+    "SPX":      {"name": "S&P 500",         "type": "index",      "yahoo": "^GSPC"},
+    "BTC-USD":  {"name": "Bitcoin",         "type": "crypto",     "yahoo": "BTC-USD"},
+    "XAU-USD":  {"name": "Gold",            "type": "commodity",  "yahoo": "GC=F"},
+    "DXY":      {"name": "US Dollar Index", "type": "forex",      "yahoo": "DX-Y.NYB"},
+}
+
+
+def _is_us_market_open():
+    """判断美股市场是否开盘（简化版：仅判断 ET 时区工作日 09:30-16:00）"""
+    import datetime
+    utc = datetime.datetime.now(datetime.timezone.utc)
+    # ET 时区 (UTC-4 夏令时 / UTC-5 标准时)
+    et_offset = datetime.timedelta(hours=-4 if _is_dst(utc) else -5)
+    et = utc + et_offset
+    wd = et.weekday()
+    if wd >= 5:  # 周六日
+        return False
+    t = et.hour * 60 + et.minute
+    # 9:30 - 16:00 ET
+    return 570 <= t < 960
+
+
+def _is_dst(utc_dt):
+    """粗略判断是否为美国夏令时（3月第2个周日 - 11月第1个周日）"""
+    import datetime
+    year = utc_dt.year
+    # 3月第2个周日
+    mar = datetime.datetime(year, 3, 1, 7, 0, tzinfo=datetime.timezone.utc)
+    dst_start = mar + datetime.timedelta(days=(6 - mar.weekday()) % 7 + 7)
+    # 11月第1个周日
+    nov = datetime.datetime(year, 11, 1, 6, 0, tzinfo=datetime.timezone.utc)
+    dst_end = nov + datetime.timedelta(days=(6 - nov.weekday()) % 7)
+    return dst_start <= utc_dt < dst_end
+
+
+def _fetch_yahoo_quote(symbols):
+    """批量获取 Yahoo Finance 报价"""
+    syms = ",".join(symbols)
+    url = f"https://query2.finance.yahoo.com/v7/finance/quote?symbols={syms}"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "application/json",
+    })
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def _fetch_market_v2_sync():
+    """同步拉取全球金融市场数据"""
+    yahoo_symbols = [cfg["yahoo"] for cfg in MARKET_V2_ASSETS.values()]
+    result = _fetch_yahoo_quote(yahoo_symbols)
+    quotes = result.get("quoteResponse", {}).get("result", [])
+
+    assets = {}
+    for q in quotes:
+        sym = q.get("symbol", "")
+        # 找到对应的内部 symbol
+        internal = None
+        for k, v in MARKET_V2_ASSETS.items():
+            if v["yahoo"] == sym:
+                internal = k
+                break
+        if not internal:
+            continue
+        price = q.get("regularMarketPrice", 0)
+        prev = q.get("regularMarketPreviousClose", q.get("regularMarketPrice", 0))
+        change = q.get("regularMarketChange", 0)
+        change_pct = q.get("regularMarketChangePercent", 0)
+        open_ = q.get("regularMarketOpen", 0)
+        high = q.get("regularMarketDayHigh", 0)
+        low = q.get("regularMarketDayLow", 0)
+        volume = q.get("regularMarketVolume", 0)
+        market_cap = q.get("marketCap", 0)
+
+        # 格式化 volume
+        vol_str = "-"
+        if volume:
+            if volume >= 1e9:
+                vol_str = f"{volume/1e9:.2f}B"
+            elif volume >= 1e6:
+                vol_str = f"{volume/1e6:.1f}M"
+            else:
+                vol_str = f"{volume/1e3:.0f}K"
+
+        # 格式化 marketCap
+        cap_str = "-"
+        if market_cap:
+            if market_cap >= 1e12:
+                cap_str = f"{market_cap/1e12:.2f}T"
+            elif market_cap >= 1e9:
+                cap_str = f"{market_cap/1e9:.1f}B"
+            elif market_cap >= 1e6:
+                cap_str = f"{market_cap/1e6:.1f}M"
+
+        # 52 周范围
+        w52_low = q.get("fiftyTwoWeekLow", 0)
+        w52_high = q.get("fiftyTwoWeekHigh", 0)
+        w52_range = f"{w52_low:.2f} - {w52_high:.2f}" if w52_low and w52_high else "-"
+        day_range = f"{low:.2f} - {high:.2f}" if low and high else "-"
+
+        assets[internal] = {
+            "price": round(price, 2),
+            "change": round(change, 2),
+            "changePct": round(change_pct, 2),
+            "open": round(open_, 2) if open_ else round(price, 2),
+            "prevClose": round(prev, 2) if prev else round(price, 2),
+            "high": round(high, 2) if high else round(price, 2),
+            "low": round(low, 2) if low else round(price, 2),
+            "volume": vol_str,
+            "marketCap": cap_str,
+            "dayRange": day_range,
+            "week52Range": w52_range,
+        }
+
+    # 确保所有资产都有条目（缺失的用占位）
+    for k in MARKET_V2_ASSETS:
+        if k not in assets:
+            assets[k] = {"price": 0, "change": 0, "changePct": 0, "open": 0, "prevClose": 0,
+                         "high": 0, "low": 0, "volume": "-", "marketCap": "-",
+                         "dayRange": "-", "week52Range": "-"}
+
+    return {
+        "marketOpen": _is_us_market_open(),
+        "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "assets": assets,
+    }
+
+
+def _refresh_market_v2_async():
+    """异步刷新 market-v2 缓存"""
+    if _market_v2_cache["updating"]:
+        return
+    _market_v2_cache["updating"] = True
+
+    def _do():
+        try:
+            data = _fetch_market_v2_sync()
+            _market_v2_cache["data"] = data
+            _market_v2_cache["updated_at"] = time.time()
+            _market_v2_cache["last_error"] = None
+            print(f"[market-v2] 刷新成功: {len(data['assets'])} 个资产")
+        except Exception as e:
+            _market_v2_cache["last_error"] = str(e)
+            print(f"[market-v2] 刷新失败: {e}")
+        finally:
+            _market_v2_cache["updating"] = False
+
+    threading.Thread(target=_do, daemon=True).start()
+
+
+def get_market_v2_data():
+    """获取 market-v2 数据：缓存有效返回缓存；过期同步拉取"""
+    now = time.time()
+    age = now - _market_v2_cache["updated_at"]
+    if _market_v2_cache["data"] is not None and age < MARKET_V2_TTL:
+        if age > MARKET_V2_TTL * 0.85 and not _market_v2_cache["updating"]:
+            _refresh_market_v2_async()
+        return _market_v2_cache["data"]
+
+    try:
+        data = _fetch_market_v2_sync()
+        _market_v2_cache["data"] = data
+        _market_v2_cache["updated_at"] = time.time()
+        _market_v2_cache["last_error"] = None
+        return data
+    except Exception as e:
+        _market_v2_cache["last_error"] = str(e)
+        if _market_v2_cache["data"]:
+            return _market_v2_cache["data"]
+        # 首次失败返回空结构
+        return {
+            "marketOpen": _is_us_market_open(),
+            "updatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "assets": {},
+            "error": str(e),
+        }
+
+
 # ---- HTTP 处理器 ----
 class RossAPIHandler(BaseHTTPRequestHandler):
 
@@ -350,6 +552,17 @@ class RossAPIHandler(BaseHTTPRequestHandler):
             payload["cache_age"] = int(time.time() - _market_cache["updated_at"]) \
                 if _market_cache["updated_at"] else -1
             payload["server_time"] = int(time.time())
+            self._send_json(payload)
+            return
+
+        # === 全球市场数据 GET (Market V2) ===
+        if path == "/api/market-v2":
+            data = get_market_v2_data()
+            payload = dict(data)
+            payload["cache_age"] = int(time.time() - _market_v2_cache["updated_at"]) \
+                if _market_v2_cache["updated_at"] else -1
+            payload["server_time"] = int(time.time())
+            payload["is_fallback"] = bool(_market_v2_cache["last_error"])
             self._send_json(payload)
             return
 
