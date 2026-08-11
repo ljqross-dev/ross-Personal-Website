@@ -172,7 +172,7 @@
 
   function renderFlashHTML(item) {
     var timeStr = timeAgo(item.date);
-    var newBadge = isNew(item.date) ? '<span class="ainews-new">NEW</span>' : '';
+    var newBadge = isNew(item.date) ? '<span class="ainews-new"><i class="ainews-new-ico" aria-hidden="true"></i>NEW</span>' : '';
     return '<a class="ainews-flash" href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer">' +
       '<span class="ainews-flash-label">\u5feb\u8baf</span>' +
       '<span class="ainews-flash-time">' + timeStr + '</span>' +
@@ -188,7 +188,7 @@
   }
   function renderWaterfallHTML(item) {
     var timeStr = timeAgo(item.date);
-    var newBadge = isNew(item.date) ? '<span class="ainews-new">NEW</span>' : '';
+    var newBadge = isNew(item.date) ? '<span class="ainews-new"><i class="ainews-new-ico" aria-hidden="true"></i>NEW</span>' : '';
     return '<a class="ainews-waterfall-item" href="' + esc(item.url) + '" target="_blank" rel="noopener noreferrer">' +
       '<div class="ainews-waterfall-main">' +
         '<h4 class="ainews-waterfall-title">' + esc(item.title) + newBadge + '</h4>' +
@@ -228,11 +228,28 @@
       html += '<div class="ainews-divider"></div>';
       html += '<div class="ainews-section ainews-section--waterfall">';
       html += '<div class="ainews-section-header"><span class="ainews-section-title">\u7011\u5e03\u6d41\u8d44\u8baf</span></div>';
-      html += '<div class="ainews-waterfall-list">';
-      waterfall.forEach(function (item) { html += renderWaterfallHTML(item); });
-      html += '</div></div>';
+      var wfItems = '';
+      waterfall.forEach(function (item) { wfItems += renderWaterfallHTML(item); });
+      html += '<div class="ainews-waterfall-list" data-waterfall-scroll style="--wf-duration:' + Math.max(22, waterfall.length * 3.2) + 's">';
+      html += '<div class="ainews-waterfall-track">';
+      html += '<div class="ainews-waterfall-group">' + wfItems + '</div>';
+      html += '<div class="ainews-waterfall-group" aria-hidden="true">' + wfItems + '</div>';
+      html += '</div></div></div>';
     }
     container.innerHTML = html;
+    requestAnimationFrame(function () {
+      var list = container.querySelector('[data-waterfall-scroll]');
+      if (!list) return;
+      var group = list.querySelector('.ainews-waterfall-group');
+      if (!group) return;
+      if (group.offsetHeight <= list.clientHeight + 4) {
+        var dup = list.querySelector('.ainews-waterfall-group[aria-hidden="true"]');
+        if (dup) dup.remove();
+        list.classList.remove('is-auto');
+      } else {
+        list.classList.add('is-auto');
+      }
+    });
   };
 
   function initNewsPanel() {
@@ -253,53 +270,64 @@
   }
 
   /* ============================================================
-     Panel 2: AI 工具（aixzd.com 真实数据 + 官网 logo）
+     Panel 2: AI 工具（JSON 配置 + Simple Icons / Iconify logo）
+     优先 Simple Icons(jsDelivr)；库内无品牌再用 Iconify logos / 官网 favicon
      ============================================================ */
+  function siLogo(slug) {
+    return 'https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/' + slug + '.svg';
+  }
+  function icyLogo(id) {
+    return 'https://api.iconify.design/' + id + '.svg';
+  }
+  function favLogo(domain) {
+    return 'https://www.google.com/s2/favicons?domain=' + domain + '&sz=64';
+  }
+
   var TOOLS_DATA = [
     // 对话聊天
-    { name: 'ChatGPT', desc: 'OpenAI 旗舰对话模型，支持多模态理解与代码生成', category: '对话聊天', url: 'https://chatgpt.com', logo: 'https://www.google.com/s2/favicons?domain=chatgpt.com&sz=64' },
-    { name: 'Claude', desc: 'Anthropic 长上下文助手，擅长文档分析与代码审查', category: '对话聊天', url: 'https://claude.ai', logo: 'https://www.google.com/s2/favicons?domain=claude.ai&sz=64' },
-    { name: 'Perplexity', desc: 'AI 搜索引擎，提供带引用来源的智能问答', category: '对话聊天', url: 'https://www.perplexity.ai', logo: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64' },
-    { name: '纳米 Work', desc: 'AI 智能体办公平台，把任务交给 AI 直接交付结果', category: '效率助手', url: 'https://work.n.cn', logo: 'https://www.google.com/s2/favicons?domain=work.n.cn&sz=64' },
-    { name: '千问办公', desc: '阿里通义办公套件，文档/表格/演示 AI 一体化', category: '效率助手', url: 'https://www.aliyun.com/product/qoderwork', logo: 'https://www.google.com/s2/favicons?domain=aliyun.com&sz=64' },
-    { name: 'Notion AI', desc: '知识管理工具内置 AI，支持写作、总结与知识图谱', category: '效率助手', url: 'https://www.notion.so/product/ai', logo: 'https://www.google.com/s2/favicons?domain=notion.so&sz=64' },
+    { name: 'ChatGPT', desc: 'OpenAI 旗舰对话模型，支持多模态理解与代码生成', category: '对话聊天', url: 'https://chatgpt.com', logo: siLogo('openai') },
+    { name: 'Claude', desc: 'Anthropic 长上下文助手，擅长文档分析与代码审查', category: '对话聊天', url: 'https://claude.ai', logo: siLogo('anthropic') },
+    { name: 'Perplexity', desc: 'AI 搜索引擎，提供带引用来源的智能问答', category: '对话聊天', url: 'https://www.perplexity.ai', logo: siLogo('perplexity') },
+    { name: '纳米 Work', desc: 'AI 智能体办公平台，把任务交给 AI 直接交付结果', category: '效率助手', url: 'https://work.n.cn', logo: favLogo('work.n.cn') },
+    { name: '千问办公', desc: '阿里通义办公套件，文档/表格/演示 AI 一体化', category: '效率助手', url: 'https://www.aliyun.com/product/qoderwork', logo: siLogo('qwen') },
+    { name: 'Notion AI', desc: '知识管理工具内置 AI，支持写作、总结与知识图谱', category: '效率助手', url: 'https://www.notion.so/product/ai', logo: siLogo('notion') },
     // 图像生成
-    { name: 'Midjourney', desc: '业界领先的 AI 图像生成工具，艺术风格表现力极强', category: '图像生成', url: 'https://www.midjourney.com', logo: 'https://www.google.com/s2/favicons?domain=midjourney.com&sz=64' },
-    { name: 'Stable Diffusion', desc: '开源文生图模型，支持本地部署与高度定制', category: '图像生成', url: 'https://stability.ai', logo: 'https://www.google.com/s2/favicons?domain=stability.ai&sz=64' },
-    { name: 'Krea AI', desc: '实时 AI 图像生成与编辑，支持画布交互式创作', category: '图像生成', url: 'https://www.krea.ai', logo: 'https://www.google.com/s2/favicons?domain=krea.ai&sz=64' },
-    { name: 'Meta Image', desc: '图片视频同一页面搞定，AI 绘画一站式创作', category: '图像生成', url: 'https://imagine.meta.com', logo: 'https://www.google.com/s2/favicons?domain=meta.com&sz=64' },
+    { name: 'Midjourney', desc: '业界领先的 AI 图像生成工具，艺术风格表现力极强', category: '图像生成', url: 'https://www.midjourney.com', logo: icyLogo('logos:midjourney') },
+    { name: 'Stable Diffusion', desc: '开源文生图模型，支持本地部署与高度定制', category: '图像生成', url: 'https://stability.ai', logo: icyLogo('logos:stability-ai') },
+    { name: 'Krea AI', desc: '实时 AI 图像生成与编辑，支持画布交互式创作', category: '图像生成', url: 'https://www.krea.ai', logo: favLogo('krea.ai') },
+    { name: 'Meta Image', desc: '图片视频同一页面搞定，AI 绘画一站式创作', category: '图像生成', url: 'https://imagine.meta.com', logo: siLogo('meta') },
     { name: 'iColoring', desc: '照片变线稿，回忆也能亲手画的 AI 涂色页生成器', category: '图像生成', url: 'https://aixzd.com/icoloring', logo: '' },
-    { name: 'Recraft', desc: '生成可编辑 SVG 标志，AI 方案直接进入设计交付', category: '图像生成', url: 'https://www.recraft.ai', logo: 'https://www.google.com/s2/favicons?domain=recraft.ai&sz=64' },
+    { name: 'Recraft', desc: '生成可编辑 SVG 标志，AI 方案直接进入设计交付', category: '图像生成', url: 'https://www.recraft.ai', logo: favLogo('recraft.ai') },
     // 视频生成
-    { name: 'Runway', desc: 'AI 视频生成与编辑平台，支持 Gen-4 模型', category: '视频生成', url: 'https://runwayml.com', logo: 'https://www.google.com/s2/favicons?domain=runwayml.com&sz=64' },
-    { name: 'Pika', desc: 'AI 视频生成工具，支持风格化视频与角色一致性', category: '视频生成', url: 'https://pika.art', logo: 'https://www.google.com/s2/favicons?domain=pika.art&sz=64' },
-    { name: '即梦 AI', desc: '字节跳动旗下 AI 视频/图像生成工具，中文友好', category: '视频生成', url: 'https://jimeng.jianying.com', logo: 'https://www.google.com/s2/favicons?domain=jimeng.jianying.com&sz=64' },
+    { name: 'Runway', desc: 'AI 视频生成与编辑平台，支持 Gen-4 模型', category: '视频生成', url: 'https://runwayml.com', logo: favLogo('runwayml.com') },
+    { name: 'Pika', desc: 'AI 视频生成工具，支持风格化视频与角色一致性', category: '视频生成', url: 'https://pika.art', logo: favLogo('pika.art') },
+    { name: '即梦 AI', desc: '字节跳动旗下 AI 视频/图像生成工具，中文友好', category: '视频生成', url: 'https://jimeng.jianying.com', logo: siLogo('bytedance') },
     { name: '奇快 AI', desc: '企业级 AI 视频创作平台，电商团队首选', category: '视频生成', url: 'https://aixzd.com/qikuaiai', logo: '' },
-    { name: 'Luma AI', desc: '3D 内容生成平台，支持 NeRF 与 3D 模型创建', category: '3D 设计', url: 'https://lumalabs.ai', logo: 'https://www.google.com/s2/favicons?domain=lumalabs.ai&sz=64' },
+    { name: 'Luma AI', desc: '3D 内容生成平台，支持 NeRF 与 3D 模型创建', category: '3D 设计', url: 'https://lumalabs.ai', logo: favLogo('lumalabs.ai') },
     // 设计工具
-    { name: 'Figma AI', desc: '设计工具内置 AI，支持智能布局与设计审查', category: '设计工具', url: 'https://www.figma.com/ai', logo: 'https://www.google.com/s2/favicons?domain=figma.com&sz=64' },
-    { name: 'Canva Magic', desc: '一站式 AI 设计套件，覆盖文案、排版、图像生成', category: '设计工具', url: 'https://www.canva.com/magic', logo: 'https://www.google.com/s2/favicons?domain=canva.com&sz=64' },
-    { name: 'zeroheight', desc: 'UI 规范交给 AI，设计出稿不跑偏的设计系统工具', category: '设计工具', url: 'https://zeroheight.com', logo: 'https://www.google.com/s2/favicons?domain=zeroheight.com&sz=64' },
+    { name: 'Figma AI', desc: '设计工具内置 AI，支持智能布局与设计审查', category: '设计工具', url: 'https://www.figma.com/ai', logo: siLogo('figma') },
+    { name: 'Canva Magic', desc: '一站式 AI 设计套件，覆盖文案、排版、图像生成', category: '设计工具', url: 'https://www.canva.com/magic', logo: siLogo('canva') },
+    { name: 'zeroheight', desc: 'UI 规范交给 AI，设计出稿不跑偏的设计系统工具', category: '设计工具', url: 'https://zeroheight.com', logo: icyLogo('logos:zeroheight') },
     { name: 'pen.dev', desc: '画布放进 IDE，设计直连代码的 UI/UX 工具', category: '设计工具', url: 'https://aixzd.com/pendev', logo: '' },
     // 编程开发
-    { name: 'Cursor', desc: 'AI 原生代码编辑器，基于 VS Code 深度集成 GPT-4', category: '编程开发', url: 'https://cursor.sh', logo: 'https://www.google.com/s2/favicons?domain=cursor.sh&sz=64' },
-    { name: 'GitHub Copilot', desc: 'GitHub 官方 AI 编程助手，支持代码补全与生成', category: '编程开发', url: 'https://github.com/copilot', logo: 'https://www.google.com/s2/favicons?domain=github.com&sz=64' },
-    { name: 'AutoGen', desc: '微软开源多智能体框架，支持复杂工作流编排', category: '编程开发', url: 'https://github.com/microsoft/autogen', logo: 'https://www.google.com/s2/favicons?domain=github.com&sz=64' },
-    { name: 'LangChain', desc: '大模型应用开发框架，支持 RAG 与 Agent 构建', category: '编程开发', url: 'https://www.langchain.com', logo: 'https://www.google.com/s2/favicons?domain=langchain.com&sz=64' },
+    { name: 'Cursor', desc: 'AI 原生代码编辑器，基于 VS Code 深度集成 GPT-4', category: '编程开发', url: 'https://cursor.com', logo: siLogo('cursor') },
+    { name: 'GitHub Copilot', desc: 'GitHub 官方 AI 编程助手，支持代码补全与生成', category: '编程开发', url: 'https://github.com/copilot', logo: siLogo('githubcopilot') },
+    { name: 'AutoGen', desc: '微软开源多智能体框架，支持复杂工作流编排', category: '编程开发', url: 'https://github.com/microsoft/autogen', logo: siLogo('microsoft') },
+    { name: 'LangChain', desc: '大模型应用开发框架，支持 RAG 与 Agent 构建', category: '编程开发', url: 'https://www.langchain.com', logo: siLogo('langchain') },
     // 音频创作
-    { name: 'Suno', desc: 'AI 音乐生成工具，支持歌词到完整歌曲创作', category: '音频创作', url: 'https://suno.ai', logo: 'https://www.google.com/s2/favicons?domain=suno.ai&sz=64' },
-    { name: 'ElevenLabs', desc: '高质量 AI 语音合成，支持多语言与声音克隆', category: '音频创作', url: 'https://elevenlabs.io', logo: 'https://www.google.com/s2/favicons?domain=elevenlabs.io&sz=64' },
+    { name: 'Suno', desc: 'AI 音乐生成工具，支持歌词到完整歌曲创作', category: '音频创作', url: 'https://suno.ai', logo: siLogo('suno') },
+    { name: 'ElevenLabs', desc: '高质量 AI 语音合成，支持多语言与声音克隆', category: '音频创作', url: 'https://elevenlabs.io', logo: siLogo('elevenlabs') },
     { name: 'Music Bento', desc: '让创作有声，让灵感成歌的 AI 音乐平台', category: '音频创作', url: 'https://aixzd.com/musicbento', logo: '' },
     // 大模型
-    { name: 'LM Studio', desc: '本地大模型运行平台，支持离线推理与 API 服务', category: '大模型', url: 'https://lmstudio.ai', logo: 'https://www.google.com/s2/favicons?domain=lmstudio.ai&sz=64' },
-    { name: 'Ollama', desc: '本地运行开源大模型的极简工具，一行命令启动', category: '大模型', url: 'https://ollama.com', logo: 'https://www.google.com/s2/favicons?domain=ollama.com&sz=64' },
+    { name: 'LM Studio', desc: '本地大模型运行平台，支持离线推理与 API 服务', category: '大模型', url: 'https://lmstudio.ai', logo: siLogo('lmstudio') },
+    { name: 'Ollama', desc: '本地运行开源大模型的极简工具，一行命令启动', category: '大模型', url: 'https://ollama.com', logo: siLogo('ollama') },
     { name: 'Atlas Cloud', desc: '400+ AI 模型一键接入的统一大模型 API 平台', category: '大模型', url: 'https://aixzd.com/atlascloud', logo: '' },
     { name: 'deepkey', desc: '一个入口直连多家大模型 API 的统一网关', category: '大模型', url: 'https://aixzd.com/deepkey', logo: '' },
     // 数字人
-    { name: 'D-ID', desc: 'AI 数字人视频生成，照片开口说话', category: '数字人', url: 'https://www.d-id.com', logo: 'https://www.google.com/s2/favicons?domain=d-id.com&sz=64' },
-    { name: 'HeyGen', desc: '企业级 AI 数字人平台，支持多语言口播视频', category: '数字人', url: 'https://www.heygen.com', logo: 'https://www.google.com/s2/favicons?domain=heygen.com&sz=64' },
+    { name: 'D-ID', desc: 'AI 数字人视频生成，照片开口说话', category: '数字人', url: 'https://www.d-id.com', logo: favLogo('d-id.com') },
+    { name: 'HeyGen', desc: '企业级 AI 数字人平台，支持多语言口播视频', category: '数字人', url: 'https://www.heygen.com', logo: favLogo('heygen.com') },
     // 3D 设计
-    { name: 'Tripo AI', desc: '文字/图片生成 3D 模型，支持游戏与动画管线', category: '3D 设计', url: 'https://www.tripo3d.ai', logo: 'https://www.google.com/s2/favicons?domain=tripo3d.ai&sz=64' },
+    { name: 'Tripo AI', desc: '文字/图片生成 3D 模型，支持游戏与动画管线', category: '3D 设计', url: 'https://www.tripo3d.ai', logo: favLogo('tripo3d.ai') },
     { name: 'ABOT', desc: '上传一张图直接走进 3D 世界的 AI 空间创作工具', category: '3D 设计', url: 'https://aixzd.com/abot-world', logo: '' }
   ];
 
@@ -326,14 +354,16 @@
     // 渲染工具列表（使用真实 logo，空 logo 直接 fallback）
     var filtered = ACTIVE_TOOL_CAT === '全部' ? TOOLS_DATA : TOOLS_DATA.filter(function (t) { return t.category === ACTIVE_TOOL_CAT; });
     grid.innerHTML = filtered.map(function (t) {
-      var fbBg = hashColor(t.name);
-      var fbLetter = esc(t.name.charAt(0));
-      var hasLogo = t.logo && t.logo.indexOf('aixzd.com') === -1;
+      var raw = String(t.name || '').replace(/[^a-zA-Z0-9\u4e00-\u9fff]/g, '');
+      var fbLetter = esc((raw.charAt(0) || '?').toUpperCase());
+      // 禁止使用来源站 aixzd 的 favicon 冒充品牌 logo
+      var logoUrl = String(t.logo || '').trim();
+      var hasLogo = !!(logoUrl && logoUrl.indexOf('aixzd.com') === -1);
       var iconHtml = hasLogo
-        ? '<img class="tools-item-logo" src="' + esc(t.logo) + '" alt="' + esc(t.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\';"><span class="tools-item-icon-fallback">' + fbLetter + '</span>'
+        ? '<img class="tools-item-logo" src="' + esc(logoUrl) + '" alt="' + esc(t.name) + '" loading="lazy" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'inline-flex\';"><span class="tools-item-icon-fallback">' + fbLetter + '</span>'
         : '<span class="tools-item-icon-fallback" style="display:inline-flex">' + fbLetter + '</span>';
       return '<a class="tools-item" href="' + esc(t.url) + '" target="_blank" rel="noopener">' +
-        '<span class="tools-item-icon" style="background:' + fbBg + '">' + iconHtml + '</span>' +
+        '<span class="tools-item-icon">' + iconHtml + '</span>' +
         '<div class="tools-item-body">' +
           '<div class="tools-item-name">' + esc(t.name) + '</div>' +
           '<div class="tools-item-desc">' + esc(t.desc) + '</div>' +
@@ -351,62 +381,233 @@
      Panel 3: 市场行情（3 信息卡 + 自建 API 实时报价）
      ============================================================ */
 
-  var MARKET_API = 'https://ross.hk/api/market-v2'; // 可切换为 https://api.ross.hk 待 DNS 就绪
+  // 行情 API：正式域名 / 同域相对路径均可
+  var MARKET_API_PRIMARY = 'https://ross.hk/api/market-v2';
+  var MARKET_API_FALLBACK = '/api/market-v2';
   var MARKET_REFRESH_MS = 60000; // 60s 自动刷新
   var _marketTimer = null;
 
-  // 顶部 3 张信息卡的静态数据
-  var MARKET_INFO_CARDS = [
+  function resolveMarketApi() {
+    var host = (location.hostname || '').toLowerCase();
+    if (host === 'ross.hk' || host === 'www.ross.hk') {
+      return MARKET_API_PRIMARY;
+    }
+    return MARKET_API_FALLBACK;
+  }
+
+  /* —— 三栏 AI 资讯速览：RSS 实时拉取 + 关键词分类 —— */
+  var MARKET_NEWS_CACHE_KEY = 'ross_market_info_news_v1';
+  var MARKET_NEWS_TTL = 60 * 60 * 1000; // 1h
+  var MARKET_NEWS_PER_CARD = 3;
+
+  var MARKET_NEWS_SOURCES = [
+    { name: 'OpenAI', url: 'https://openai.com/blog/rss.xml' },
+    { name: 'TechCrunch', url: 'https://techcrunch.com/category/artificial-intelligence/feed/' },
+    { name: 'The Verge', url: 'https://www.theverge.com/rss/ai-artificial-intelligence/index.xml' },
+    { name: 'VentureBeat', url: 'https://venturebeat.com/category/ai/feed/' },
+    { name: '36氪', url: 'https://36kr.com/feed' },
+    { name: '量子位', url: 'https://www.qbitai.com/feed' }
+  ];
+
+  var MARKET_CARD_DEFS = [
     {
+      key: 'openai',
       title: 'OpenAI 动态',
-      icon: '◈',
-      iconColor: '#10A37F',
-      items: [
-        { time: '2小时前', text: 'GPT-5 预览版已开放 API 申请通道' },
-        { time: '1天前', text: 'Sora 2 视频生成时长突破 60 秒，支持多镜头叙事' },
-        { time: '3天前', text: 'OpenAI 与多家车企达成合作，Agent 接入车机系统' }
-      ]
+      iconSrc: 'images/market/icon-openai.png',
+      keywords: ['openai', 'gpt', 'chatgpt', 'sora', 'dall-e', 'dalle', 'whisper', 'o1', 'o3', 'sam altman']
     },
     {
+      key: 'models',
       title: '模型发布',
-      icon: '◇',
-      iconColor: '#C8412B',
-      items: [
-        { time: '4小时前', text: '字节跳动 Seedance 2.5：30 秒连续叙事视频' },
-        { time: '6小时前', text: '阿里通义语音识别新模型上线，专业术语识别增强' },
-        { time: '1天前', text: '谷歌 Gemini 3.5 Pro 短暂现身 Arena 后下架' }
+      iconSrc: 'images/market/icon-models.png',
+      keywords: [
+        'model', 'gemini', 'claude', 'llama', 'deepseek', 'qwen', '通义', 'seedance', 'midjourney',
+        'runway', 'flux', 'stable diffusion', 'mistral', '发布', '上线', '开源', 'preview', 'launch'
       ]
     },
     {
+      key: 'funding',
       title: 'AI 公司融资',
-      icon: '◆',
-      iconColor: '#4A7C59',
-      items: [
-        { time: '12小时前', text: 'xAI 完成 60 亿美元 E 轮融资，估值升至 2000 亿' },
-        { time: '2天前', text: 'Anthropic 估值突破 3000 亿美元，员工持股可套现' },
-        { time: '5天前', text: 'Mistral AI 获 20 亿美元战略投资，加速欧洲落地' }
+      iconSrc: 'images/market/icon-funding.png',
+      keywords: [
+        'fund', 'funding', 'financ', 'valuation', 'invest', 'series', 'raise', 'ipo', 'billion',
+        '融资', '估值', '投资', '轮', '收购', '收购'
       ]
     }
   ];
 
-  function renderMarketInfoCards() {
+  var MARKET_INFO_FALLBACK = [
+    {
+      title: 'OpenAI 动态',
+      iconSrc: 'images/market/icon-openai.png',
+      items: [
+        { time: '—', text: 'GPT-5 预览版已开放 API 申请通道', url: 'https://openai.com' },
+        { time: '—', text: 'Sora 2 视频生成时长突破 60 秒，支持多镜头叙事', url: 'https://openai.com/sora' },
+        { time: '—', text: 'OpenAI 与多家车企达成合作，Agent 接入车机系统', url: 'https://openai.com' }
+      ]
+    },
+    {
+      title: '模型发布',
+      iconSrc: 'images/market/icon-models.png',
+      items: [
+        { time: '—', text: '字节跳动 Seedance 2.5：30 秒连续叙事视频', url: 'https://bytedance.com' },
+        { time: '—', text: '阿里通义语音识别新模型上线，专业术语识别增强', url: 'https://tongyi.aliyun.com' },
+        { time: '—', text: '谷歌 Gemini 3.5 Pro 短暂现身 Arena 后下架', url: 'https://gemini.google.com' }
+      ]
+    },
+    {
+      title: 'AI 公司融资',
+      iconSrc: 'images/market/icon-funding.png',
+      items: [
+        { time: '—', text: 'xAI 完成 60 亿美元 E 轮融资，估值升至 2000 亿', url: 'https://x.ai' },
+        { time: '—', text: 'Anthropic 估值突破 3000 亿美元，员工持股可套现', url: 'https://www.anthropic.com' },
+        { time: '—', text: 'Mistral AI 获 20 亿美元战略投资，加速欧洲落地', url: 'https://mistral.ai' }
+      ]
+    }
+  ];
+
+  function fetchMarketRss(source) {
+    var apiUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(source.url);
+    return new Promise(function (resolve) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', apiUrl, true);
+      xhr.timeout = 12000;
+      xhr.onreadystatechange = function () {
+        if (xhr.readyState !== 4) return;
+        if (xhr.status === 200) {
+          try {
+            var data = JSON.parse(xhr.responseText);
+            if (data.status === 'ok' && data.items) {
+              resolve(data.items.slice(0, 8).map(function (item) {
+                var ts = new Date(item.pubDate).getTime();
+                if (!ts || isNaN(ts)) ts = now();
+                return {
+                  title: (item.title || '').replace(/\s+/g, ' ').trim(),
+                  url: item.link || '',
+                  date: ts,
+                  source: source.name
+                };
+              }).filter(function (x) { return !!x.title; }));
+              return;
+            }
+          } catch (e) {}
+        }
+        resolve([]);
+      };
+      xhr.onerror = function () { resolve([]); };
+      xhr.ontimeout = function () { resolve([]); };
+      xhr.send();
+    });
+  }
+
+  function matchKeywords(title, keywords) {
+    var t = (title || '').toLowerCase();
+    for (var i = 0; i < keywords.length; i++) {
+      if (t.indexOf(String(keywords[i]).toLowerCase()) >= 0) return true;
+    }
+    return false;
+  }
+
+  function buildMarketInfoCards(allItems) {
+    var used = {};
+    var cards = MARKET_CARD_DEFS.map(function (def) {
+      var picked = [];
+      for (var i = 0; i < allItems.length && picked.length < MARKET_NEWS_PER_CARD; i++) {
+        var it = allItems[i];
+        var key = (it.url || it.title);
+        if (used[key]) continue;
+        if (!matchKeywords(it.title, def.keywords)) continue;
+        used[key] = true;
+        picked.push({ time: timeAgo(it.date), text: it.title, url: it.url || '', date: it.date });
+      }
+      for (var j = 0; j < allItems.length && picked.length < MARKET_NEWS_PER_CARD; j++) {
+        var fill = allItems[j];
+        var fk = (fill.url || fill.title);
+        if (used[fk]) continue;
+        used[fk] = true;
+        picked.push({ time: timeAgo(fill.date), text: fill.title, url: fill.url || '', date: fill.date });
+      }
+      return { title: def.title, iconSrc: def.iconSrc, items: picked };
+    });
+    var ok = cards.every(function (c) { return c.items && c.items.length > 0; });
+    return ok ? cards : null;
+  }
+
+  function renderMarketInfoCards(cards) {
     var wrap = $('marketInfoCards');
     if (!wrap) return;
-    wrap.innerHTML = MARKET_INFO_CARDS.map(function (card) {
-      var itemsHtml = card.items.map(function (it) {
-        return '<li class="market-info-item">' +
-          '<span class="market-info-time">' + esc(it.time) + '</span>' +
-          '<span class="market-info-text">' + esc(it.text) + '</span>' +
-        '</li>';
+    var data = cards && cards.length ? cards : MARKET_INFO_FALLBACK;
+    wrap.innerHTML = data.map(function (card) {
+      var itemsHtml = (card.items || []).map(function (it) {
+        var inner = '<span class="market-info-time">' + esc(it.time || '—') + '</span>' +
+          '<span class="market-info-text">' + esc(it.text) + '</span>';
+        if (it.url) {
+          return '<li><a class="market-info-item" href="' + esc(it.url) + '" target="_blank" rel="noopener noreferrer">' + inner + '</a></li>';
+        }
+        return '<li class="market-info-item">' + inner + '</li>';
       }).join('');
       return '<article class="market-info-card">' +
         '<header class="market-info-header">' +
-          '<span class="market-info-icon" style="background:' + esc(card.iconColor) + '">' + esc(card.icon) + '</span>' +
+          '<span class="market-info-icon" aria-hidden="true">' +
+            '<img src="' + esc(card.iconSrc) + '" alt="" width="24" height="24" loading="lazy" />' +
+          '</span>' +
           '<h4 class="market-info-title">' + esc(card.title) + '</h4>' +
         '</header>' +
         '<ul class="market-info-list">' + itemsHtml + '</ul>' +
       '</article>';
     }).join('');
+  }
+
+  function loadMarketInfoCards(forceRefresh) {
+    if (!forceRefresh) {
+      try {
+        var cached = localStorage.getItem(MARKET_NEWS_CACHE_KEY);
+        if (cached) {
+          var pack = JSON.parse(cached);
+          if (pack.ts && (now() - pack.ts) < MARKET_NEWS_TTL && pack.cards && pack.cards.length) {
+            var refreshed = pack.cards.map(function (card) {
+              return {
+                title: card.title,
+                iconSrc: card.iconSrc,
+                items: (card.items || []).map(function (it) {
+                  return {
+                    time: it.date ? timeAgo(it.date) : (it.time || '—'),
+                    text: it.text,
+                    url: it.url || ''
+                  };
+                })
+              };
+            });
+            renderMarketInfoCards(refreshed);
+            return;
+          }
+        }
+      } catch (e) {}
+    }
+
+    renderMarketInfoCards(MARKET_INFO_FALLBACK);
+
+    Promise.all(MARKET_NEWS_SOURCES.map(fetchMarketRss)).then(function (results) {
+      var all = [];
+      results.forEach(function (items) { all = all.concat(items); });
+      var seen = {};
+      all = all.filter(function (it) {
+        var k = (it.url || '') + '|' + it.title;
+        if (seen[k]) return false;
+        seen[k] = true;
+        return true;
+      });
+      all.sort(function (a, b) { return b.date - a.date; });
+      var cards = buildMarketInfoCards(all);
+      if (!cards) {
+        renderMarketInfoCards(MARKET_INFO_FALLBACK);
+        return;
+      }
+      renderMarketInfoCards(cards);
+      try {
+        localStorage.setItem(MARKET_NEWS_CACHE_KEY, JSON.stringify({ ts: now(), cards: cards }));
+      } catch (e) {}
+    });
   }
 
   function renderQuoteCard(item) {
@@ -438,7 +639,8 @@
   }
 
   function fetchAndRenderMarket() {
-    fetch(MARKET_API)
+    var api = resolveMarketApi();
+    fetch(api, { credentials: 'omit', cache: 'no-store' })
       .then(function (r) {
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
@@ -506,7 +708,7 @@
   }
 
   function initMarketPanel() {
-    renderMarketInfoCards();
+    loadMarketInfoCards(false);
     // 先用骨架占位，API 异步填充
     var stocksEl = $('marketStocks');
     var idxEl = $('marketIndices');
@@ -521,22 +723,22 @@
      Panel 4: Trending Models（静态数据）
      ============================================================ */
   var MODELS_DATA = [
-    { name: 'GPT-5', org: 'OpenAI', category: '多模态', trend: 'hot', desc: '下一代旗舰模型，推理与多模态能力大幅提升', logo: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64', url: 'https://openai.com' },
-    { name: 'Claude 4', org: 'Anthropic', category: '长上下文', trend: 'hot', desc: '200K 上下文窗口，代码与文档分析能力卓越', logo: 'https://www.google.com/s2/favicons?domain=anthropic.com&sz=64', url: 'https://claude.ai' },
-    { name: 'Gemini 3.5 Pro', org: 'Google', category: '多模态', trend: 'hot', desc: '短暂现身 Arena，性能大幅超越前代', logo: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64', url: 'https://gemini.google.com' },
-    { name: 'Seedance 2.5', org: 'ByteDance', category: '视频生成', trend: 'hot', desc: '支持多素材参考，30 秒连续叙事视频生成', logo: 'https://www.google.com/s2/favicons?domain=bytedance.com&sz=64', url: 'https://bytedance.com' },
-    { name: 'MiniMax H3', org: 'MiniMax', category: '视频生成', trend: 'hot', desc: '通用视频模型，最高 15 秒 2K 双声道生成', logo: 'https://www.google.com/s2/favicons?domain=minimaxi.com&sz=64', url: 'https://www.minimaxi.com' },
-    { name: 'Sora', org: 'OpenAI', category: '视频生成', trend: 'rise', desc: '高保真视频生成，物理模拟能力突出', logo: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64', url: 'https://openai.com/sora' },
-    { name: 'Runway Gen-4', org: 'Runway', category: '视频生成', trend: 'rise', desc: '时长突破 40 秒，运动一致性显著改善', logo: 'https://www.google.com/s2/favicons?domain=runwayml.com&sz=64', url: 'https://runwayml.com' },
-    { name: 'FLUX 3', org: 'Black Forest Labs', category: '图像生成', trend: 'hot', desc: '开源图像生成新标杆，文字渲染与构图顶级', logo: 'https://www.google.com/s2/favicons?domain=blackforestlabs.ai&sz=64', url: 'https://blackforestlabs.ai' },
-    { name: 'Midjourney V7', org: 'Midjourney', category: '图像生成', trend: 'steady', desc: '写实风格再进化，艺术表现力行业顶尖', logo: 'https://www.google.com/s2/favicons?domain=midjourney.com&sz=64', url: 'https://www.midjourney.com' },
-    { name: 'Nano Banana 2', org: 'Google', category: '图像生成', trend: 'rise', desc: '接入谷歌地球，因滥用风险紧急撤回后关注度飙升', logo: 'https://www.google.com/s2/favicons?domain=google.com&sz=64', url: 'https://gemini.google.com' },
-    { name: 'Stable Diffusion 3.5', org: 'Stability AI', category: '图像生成', trend: 'rise', desc: '开源模型质量逼近闭源，社区生态活跃', logo: 'https://www.google.com/s2/favicons?domain=stability.ai&sz=64', url: 'https://stability.ai' },
-    { name: '通义语音', org: 'Alibaba', category: '语音识别', trend: 'hot', desc: '专业术语转写与热词定制能力同步增强', logo: 'https://www.google.com/s2/favicons?domain=alibaba.com&sz=64', url: 'https://tongyi.aliyun.com' },
-    { name: 'Llama 4', org: 'Meta', category: '开源大模型', trend: 'rise', desc: '开源模型新高度，支持多模态与工具调用', logo: 'https://www.google.com/s2/favicons?domain=meta.com&sz=64', url: 'https://llama.meta.com' },
-    { name: 'DeepSeek-V3', org: 'DeepSeek', category: '开源大模型', trend: 'hot', desc: '国产开源模型，性价比与代码能力领先', logo: 'https://www.google.com/s2/favicons?domain=deepseek.com&sz=64', url: 'https://www.deepseek.com' },
-    { name: 'Qwen3', org: 'Alibaba', category: '开源大模型', trend: 'rise', desc: '通义千问第三代，中文理解与 Agent 能力强', logo: 'https://www.google.com/s2/favicons?domain=alibaba.com&sz=64', url: 'https://tongyi.aliyun.com' },
-    { name: 'Kimi K2', org: 'Moonshot', category: '长上下文', trend: 'steady', desc: '200万字上下文，长文档分析国内领先', logo: 'https://www.google.com/s2/favicons?domain=moonshot.cn&sz=64', url: 'https://kimi.moonshot.cn' }
+    { name: 'GPT-5', org: 'OpenAI', category: '多模态', trend: 'hot', desc: '下一代旗舰模型，推理与多模态能力大幅提升', logo: siLogo('openai'), url: 'https://openai.com' },
+    { name: 'Claude 4', org: 'Anthropic', category: '长上下文', trend: 'hot', desc: '200K 上下文窗口，代码与文档分析能力卓越', logo: siLogo('anthropic'), url: 'https://claude.ai' },
+    { name: 'Gemini 3.5 Pro', org: 'Google', category: '多模态', trend: 'hot', desc: '短暂现身 Arena，性能大幅超越前代', logo: siLogo('googlegemini'), url: 'https://gemini.google.com' },
+    { name: 'Seedance 2.5', org: 'ByteDance', category: '视频生成', trend: 'hot', desc: '支持多素材参考，30 秒连续叙事视频生成', logo: siLogo('bytedance'), url: 'https://bytedance.com' },
+    { name: 'MiniMax H3', org: 'MiniMax', category: '视频生成', trend: 'hot', desc: '通用视频模型，最高 15 秒 2K 双声道生成', logo: siLogo('minimax'), url: 'https://www.minimaxi.com' },
+    { name: 'Sora', org: 'OpenAI', category: '视频生成', trend: 'rise', desc: '高保真视频生成，物理模拟能力突出', logo: siLogo('openai'), url: 'https://openai.com/sora' },
+    { name: 'Runway Gen-4', org: 'Runway', category: '视频生成', trend: 'rise', desc: '时长突破 40 秒，运动一致性显著改善', logo: favLogo('runwayml.com'), url: 'https://runwayml.com' },
+    { name: 'FLUX 3', org: 'Black Forest Labs', category: '图像生成', trend: 'hot', desc: '开源图像生成新标杆，文字渲染与构图顶级', logo: siLogo('flux'), url: 'https://blackforestlabs.ai' },
+    { name: 'Midjourney V7', org: 'Midjourney', category: '图像生成', trend: 'steady', desc: '写实风格再进化，艺术表现力行业顶尖', logo: icyLogo('logos:midjourney'), url: 'https://www.midjourney.com' },
+    { name: 'Nano Banana 2', org: 'Google', category: '图像生成', trend: 'rise', desc: '接入谷歌地球，因滥用风险紧急撤回后关注度飙升', logo: siLogo('googlegemini'), url: 'https://gemini.google.com' },
+    { name: 'Stable Diffusion 3.5', org: 'Stability AI', category: '图像生成', trend: 'rise', desc: '开源模型质量逼近闭源，社区生态活跃', logo: icyLogo('logos:stability-ai'), url: 'https://stability.ai' },
+    { name: '通义语音', org: 'Alibaba', category: '语音识别', trend: 'hot', desc: '专业术语转写与热词定制能力同步增强', logo: siLogo('qwen'), url: 'https://tongyi.aliyun.com' },
+    { name: 'Llama 4', org: 'Meta', category: '开源大模型', trend: 'rise', desc: '开源模型新高度，支持多模态与工具调用', logo: siLogo('meta'), url: 'https://llama.meta.com' },
+    { name: 'DeepSeek-V3', org: 'DeepSeek', category: '开源大模型', trend: 'hot', desc: '国产开源模型，性价比与代码能力领先', logo: siLogo('deepseek'), url: 'https://www.deepseek.com' },
+    { name: 'Qwen3', org: 'Alibaba', category: '开源大模型', trend: 'rise', desc: '通义千问第三代，中文理解与 Agent 能力强', logo: siLogo('qwen'), url: 'https://tongyi.aliyun.com' },
+    { name: 'Kimi K2', org: 'Moonshot', category: '长上下文', trend: 'steady', desc: '200万字上下文，长文档分析国内领先', logo: favLogo('moonshot.cn'), url: 'https://kimi.moonshot.cn' }
   ];
 
   function initModelsPanel() {
@@ -559,7 +761,7 @@
           '</div>' +
           '<div class="model-desc">' + esc(m.desc) + '</div>' +
         '</div>' +
-        '<span class="model-trend ' + esc(m.trend) + '">' + trendLabel + '</span>' +
+        '<span class="model-trend ' + esc(m.trend) + '"><i class="model-trend-ico" aria-hidden="true"></i>' + trendLabel + '</span>' +
       '</a>';
     }).join('');
   }

@@ -9,20 +9,25 @@ Ross 留言板 + 市场数据 API 服务 — 纯标准库实现
 市场数据：内存缓存 90s，TTL 后异步刷新
 """
 
+import base64
 import json
 import os
-import time
 import re
+import secrets
 import threading
-import urllib.request
+import time
+import uuid
 import urllib.error
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import urllib.request
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 # ---- 配置 ----
 DATA_DIR = "/var/lib/ross-data"
 DATA_FILE = os.path.join(DATA_DIR, "guestbook.json")
 CODES_FILE = os.path.join(DATA_DIR, "a_stock_codes.json")  # A 股代码缓存
+UPLOAD_DIR = "/usr/share/nginx/html/uploads/guestbook"
+UPLOAD_URL_PREFIX = "/uploads/guestbook"
 HOST = "127.0.0.1"
 PORT = 8888
 MAX_MESSAGES = 200
@@ -30,6 +35,10 @@ RATE_LIMIT = 5
 RATE_WINDOW = 60
 MAX_TEXT_LEN = 500
 MAX_NAME_LEN = 20
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_IMAGES = 3
+# 最多 3 张图的 base64 JSON 体积（约 8.5MB）+ 文本余量
+MAX_BODY_BYTES = 9 * 1024 * 1024
 
 # ---- 市场数据缓存 ----
 MARKET_TTL = 90             # 缓存 90 秒
@@ -58,6 +67,91 @@ def save_messages(messages):
     os.makedirs(DATA_DIR, exist_ok=True)
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(messages, f, ensure_ascii=False, indent=2)
+
+
+def _detect_image(raw):
+    """根据魔数识别图片类型，返回 (ext, mime) 或 None。"""
+    if len(raw) < 12:
+        return None
+    if raw[:3] == b"\xff\xd8\xff":
+        return "jpg", "image/jpeg"
+    if raw[:8] == b"\x89PNG\r\n\x1a\n":
+        return "png", "image/png"
+    if raw[:6] in (b"GIF87a", b"GIF89a"):
+        return "gif", "image/gif"
+    if raw[:4] == b"RIFF" and raw[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    return None
+
+
+def save_guestbook_image(image_payload):
+    """
+    保存留言图片。image_payload 可为 data URL 或纯 base64。
+    成功返回公开 URL；失败抛 ValueError。
+    """
+    if not image_payload or not isinstance(image_payload, str):
+        raise ValueError("无效的图片数据")
+    payload = image_payload.strip()
+    if payload.startswith("data:"):
+        # data:image/png;base64,xxxx
+        comma = payload.find(",")
+        if comma < 0:
+            raise ValueError("图片 data URL 格式错误")
+        meta = payload[5:comma].lower()
+        if "base64" not in meta:
+            raise ValueError("仅支持 base64 图片")
+        payload = payload[comma + 1 :]
+    try:
+        raw = base64.b64decode(payload, validate=False)
+    except Exception:
+        raise ValueError("图片解码失败")
+    if not raw:
+        raise ValueError("图片为空")
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise ValueError("图片不能超过 2MB")
+    detected = _detect_image(raw)
+    if not detected:
+        raise ValueError("仅支持 JPG / PNG / GIF / WebP")
+    ext, _mime = detected
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    name = "%d_%s.%s" % (int(time.time() * 1000), uuid.uuid4().hex[:10], ext)
+    path = os.path.join(UPLOAD_DIR, name)
+    with open(path, "wb") as f:
+        f.write(raw)
+    return "%s/%s" % (UPLOAD_URL_PREFIX, name)
+
+
+def public_message(msg):
+    """对外返回留言时去掉 delete token。"""
+    if not isinstance(msg, dict):
+        return msg
+    out = dict(msg)
+    out.pop("token", None)
+    return out
+
+
+def message_image_urls(msg):
+    urls = []
+    if isinstance(msg.get("images"), list):
+        urls.extend([u for u in msg["images"] if isinstance(u, str)])
+    elif msg.get("image"):
+        urls.append(msg["image"])
+    return urls
+
+
+def delete_message_files(msg):
+    for url in message_image_urls(msg):
+        if not isinstance(url, str) or not url.startswith(UPLOAD_URL_PREFIX + "/"):
+            continue
+        name = os.path.basename(url)
+        if not name or "/" in name or "\\" in name or ".." in name:
+            continue
+        path = os.path.join(UPLOAD_DIR, name)
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError:
+            pass
 
 
 # ---- Rate limiter ----
@@ -517,9 +611,9 @@ class RossAPIHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", len(body))
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        self.send_header("Cache-Control", "public, max-age=30")
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -541,7 +635,7 @@ class RossAPIHandler(BaseHTTPRequestHandler):
 
         # === 留言板 GET ===
         if path == "/api/guestbook":
-            messages = load_messages()
+            messages = [public_message(m) for m in load_messages()]
             self._send_json({"messages": messages, "count": len(messages)})
             return
 
@@ -590,7 +684,7 @@ class RossAPIHandler(BaseHTTPRequestHandler):
                 return
 
             length = int(self.headers.get("Content-Length", 0))
-            if length == 0 or length > 10000:
+            if length == 0 or length > MAX_BODY_BYTES:
                 self._send_json({"error": "请求内容为空或过大"}, 400)
                 return
 
@@ -601,19 +695,42 @@ class RossAPIHandler(BaseHTTPRequestHandler):
                 return
 
             name = str(body.get("name", "匿名访客")).strip()[:MAX_NAME_LEN] or "匿名访客"
-            text = str(body.get("text", "")).strip()
-            if not text:
-                self._send_json({"error": "内容不能为空"}, 400)
+            text = str(body.get("text", "")).strip()[:MAX_TEXT_LEN]
+
+            raw_images = body.get("images")
+            if raw_images is None and body.get("image"):
+                raw_images = [body.get("image")]
+            if not isinstance(raw_images, list):
+                raw_images = []
+            if len(raw_images) > MAX_IMAGES:
+                self._send_json({"error": "最多上传 %d 张图片" % MAX_IMAGES}, 400)
                 return
-            text = text[:MAX_TEXT_LEN]
+
+            image_urls = []
+            for image_payload in raw_images:
+                if not image_payload:
+                    continue
+                try:
+                    image_urls.append(save_guestbook_image(image_payload))
+                except ValueError as e:
+                    self._send_json({"error": str(e)}, 400)
+                    return
+
+            if not text and not image_urls:
+                self._send_json({"error": "请填写文字或添加图片"}, 400)
+                return
 
             msg = {
                 "id": int(time.time() * 1000),
                 "name": name,
                 "text": text,
                 "date": time.strftime("%Y-%m-%d %H:%M", time.localtime()),
-                "initial": name[0].upper()
+                "initial": name[0].upper(),
+                "token": secrets.token_hex(16),
             }
+            if image_urls:
+                msg["images"] = image_urls
+                msg["image"] = image_urls[0]  # 兼容旧前端
 
             messages = load_messages()
             messages.insert(0, msg)
@@ -621,16 +738,71 @@ class RossAPIHandler(BaseHTTPRequestHandler):
                 messages = messages[:MAX_MESSAGES]
             save_messages(messages)
 
-            self._send_json({"ok": True, "message": msg})
+            self._send_json({
+                "ok": True,
+                "message": public_message(msg),
+                "token": msg["token"],
+            })
             return
 
         self._send_json({"error": "not found"}, 404)
 
 
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        if path != "/api/guestbook":
+            self._send_json({"error": "not found"}, 404)
+            return
+
+        ip = self._get_ip()
+        if is_rate_limited(ip):
+            self._send_json({"error": "太快了，请稍后再试"}, 429)
+            return
+
+        length = int(self.headers.get("Content-Length", 0))
+        if length <= 0 or length > 4096:
+            self._send_json({"error": "请求无效"}, 400)
+            return
+        try:
+            body = json.loads(self.rfile.read(length))
+        except json.JSONDecodeError:
+            self._send_json({"error": "JSON 格式错误"}, 400)
+            return
+
+        try:
+            msg_id = int(body.get("id"))
+        except (TypeError, ValueError):
+            self._send_json({"error": "无效的留言 ID"}, 400)
+            return
+        req_token = str(body.get("token") or "")
+
+        messages = load_messages()
+        target = None
+        keep = []
+        for m in messages:
+            if target is None and int(m.get("id", -1)) == msg_id:
+                target = m
+            else:
+                keep.append(m)
+        if not target:
+            self._send_json({"error": "留言不存在"}, 404)
+            return
+
+        stored = str(target.get("token") or "")
+        if stored and stored != req_token:
+            self._send_json({"error": "无权删除这条留言"}, 403)
+            return
+
+        delete_message_files(target)
+        save_messages(keep)
+        self._send_json({"ok": True, "id": msg_id})
+
+
 if __name__ == "__main__":
     os.makedirs(DATA_DIR, exist_ok=True)
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
     print(f"Ross API 启动: http://{HOST}:{PORT}/")
-    print("  - GET/POST /api/guestbook")
+    print("  - GET/POST/DELETE /api/guestbook")
     print("  - GET       /api/market")
     print("  - GET       /api/health")
     # 启动后立即预热市场缓存

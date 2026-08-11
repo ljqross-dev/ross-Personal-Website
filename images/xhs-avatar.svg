@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
-  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#C8412B"/><stop offset="1" stop-color="#E2553B"/>
-  </linearGradient></defs>
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FF6B3D"/>
+      <stop offset="0.55" stop-color="#E6492B"/>
+      <stop offset="1" stop-color="#FF8A4C"/>
+    </linearGradient>
+  </defs>
   <rect width="120" height="120" fill="#FAF8F4"/>
   <circle cx="60" cy="60" r="54" fill="url(#g)"/>
-  <text x="60" y="60" font-family="Microsoft YaHei,SimSun,serif" font-size="56" font-weight="700" fill="#FAF8F4" text-anchor="middle" dominant-baseline="central">罗</text>
+  <text x="60" y="60" font-family="Microsoft YaHei,PingFang SC,SimSun,serif" font-size="56" font-weight="700" fill="#FAF8F4" text-anchor="middle" dominant-baseline="central">罗</text>
 </svg>

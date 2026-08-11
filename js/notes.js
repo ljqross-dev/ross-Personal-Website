@@ -4,7 +4,7 @@
 window.XHS = {
   author: "进步青年罗先生r",
   profile: "https://www.xiaohongshu.com/user/profile/57da18087fc5b829c692b553?xsec_token=ABo8yX51RlXT4dJF1TfdWNp37t3uL6rM8m9ulDSETBKcw%3D&xsec_source=pc_search",
-  avatar: "images/xhs-avatar.jpg",
+  avatar: "images/xhs-avatar.svg?v=2",
   categories: [
     { id: "all", label: "全部" },
     { id: "ui-bg", label: "UI 风格背景" },

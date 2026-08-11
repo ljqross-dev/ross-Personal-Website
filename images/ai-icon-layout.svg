@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80" fill="none">
+  <defs>
+    <linearGradient id="lyShell" x1="16" y1="14" x2="64" y2="66" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".72"/>
+      <stop offset=".4" stop-color="#E0F2FE" stop-opacity=".45"/>
+      <stop offset="1" stop-color="#C4B5FD" stop-opacity=".35"/>
+    </linearGradient>
+    <linearGradient id="lyInner" x1="24" y1="26" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FB7185"/>
+      <stop offset=".45" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#38BDF8"/>
+    </linearGradient>
+    <linearGradient id="lyTop" x1="22" y1="20" x2="58" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".95"/>
+      <stop offset="1" stop-color="#F5D0FE" stop-opacity=".7"/>
+    </linearGradient>
+    <linearGradient id="lyBar" x1="28" y1="36" x2="36" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FDE68A"/>
+      <stop offset="1" stop-color="#F97316"/>
+    </linearGradient>
+    <filter id="lySoft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="3.2"/>
+    </filter>
+  </defs>
+  <ellipse cx="40" cy="69" rx="20" ry="4.2" fill="#A5B4FC" opacity=".32" filter="url(#lySoft)"/>
+  <!-- back card -->
+  <rect x="22" y="16" width="40" height="44" rx="10" fill="#DDD6FE" opacity=".45" transform="rotate(-6 42 38)"/>
+  <!-- main glass panel -->
+  <rect x="18" y="18" width="44" height="46" rx="12" fill="url(#lyShell)" stroke="#FFFFFF" stroke-width="1.4" stroke-opacity=".7"/>
+  <!-- liquid inner glow -->
+  <rect x="24" y="28" width="32" height="28" rx="8" fill="url(#lyInner)" opacity=".88"/>
+  <rect x="24" y="28" width="32" height="28" rx="8" fill="#fff" opacity=".12"/>
+  <!-- frosted top bar -->
+  <rect x="24" y="22" width="32" height="8" rx="4" fill="url(#lyTop)"/>
+  <!-- hierarchy bars -->
+  <rect x="28" y="34" width="8" height="16" rx="3" fill="url(#lyBar)"/>
+  <rect x="40" y="34" width="12" height="5" rx="2.5" fill="#fff" opacity=".92"/>
+  <rect x="40" y="42" width="10" height="5" rx="2.5" fill="#fff" opacity=".65"/>
+  <!-- specular -->
+  <path d="M22 26 C24 20 34 18 42 20" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".7"/>
+  <ellipse cx="28" cy="24" rx="4" ry="2" fill="#fff" opacity=".55"/>
+</svg>
