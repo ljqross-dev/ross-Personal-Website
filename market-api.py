@@ -6,12 +6,15 @@ Ross.hk 市场数据 API（适配国内 ECS）
 免费额度约 8 credits/分钟 → 分两次拉取，进程内缓存 5 分钟
 """
 
+import os
 import time
 import threading
 import logging
 from flask import Flask, jsonify
 
-TWELVEDATA_KEY = "REDACTED"
+TWELVEDATA_KEY = os.environ["TWELVEDATA_KEY"].strip()
+if not TWELVEDATA_KEY:
+    raise SystemExit("TWELVEDATA_KEY missing")
 CACHE_TTL = 300
 
 STOCKS = {
