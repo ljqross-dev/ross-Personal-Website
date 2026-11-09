@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Ross.hk 市场数据 API（适配国内 ECS）
-端口 8900
+Ross.hk 市场数据 API
 数据源: TwelveData（股票/指数/加密货币）
 免费额度约 8 credits/分钟 → 分两次拉取，进程内缓存 5 分钟
+监听地址与端口只从环境变量读取。
 """
 
 import os
@@ -189,4 +189,6 @@ def add_cors(response):
 if __name__ == "__main__":
     # 仅一条后台刷新线程，避免启动瞬间打爆 8 credits/min
     threading.Thread(target=worker, daemon=True).start()
-    app.run(host="0.0.0.0", port=8900, debug=False)
+    host = os.environ.get("MARKET_HOST", "127.0.0.1").strip() or "127.0.0.1"
+    port = int(os.environ["MARKET_PORT"])
+    app.run(host=host, port=port, debug=False)

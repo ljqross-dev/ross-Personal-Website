@@ -6,7 +6,7 @@
  *       写入 js/dribbble.js；若内容较上次有变化则自动重新发布。
  *
  * 密钥：仅在本地读取，绝不写入仓库 / 前端。
- *   优先顺序：环境变量 DRIBBBLE_TOKEN → 文件 C:\Users\66\.dribbble_token
+ *   优先顺序：环境变量 DRIBBBLE_TOKEN → 用户主目录下的 .dribbble_token
  *
  * 用法：node scripts/sync-dribbble.js
  *   依赖：Node >= 18（使用全局 fetch）
@@ -36,10 +36,8 @@ const CATEGORIES = [
 // ---------- 读取 token ----------
 function loadToken() {
   if (process.env.DRIBBBLE_TOKEN) return process.env.DRIBBBLE_TOKEN.trim();
-  const candidates = [
-    'C:\\Users\\66\\.dribbble_token',
-    path.join(process.env.USERPROFILE || process.env.HOME || '', '.dribbble_token')
-  ];
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  const candidates = home ? [path.join(home, '.dribbble_token')] : [];
   for (const p of candidates) {
     try {
       const t = fs.readFileSync(p, 'utf8').trim();

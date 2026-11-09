@@ -1,38 +1,65 @@
-# ross-portfolio
+# Ross的研习社
 
-Ross 个人作品集前台站点（静态站 + 轻量脚本）。
+设计 · AI · 写作。个人网站：[ross.hk](https://ross.hk/)
 
-## 线上地址
+这是个人站点的公开介绍。站上有已上线的微信小程序、打开就能用的免费工具，以及设计与 AI 研习内容。
 
-- 正式站点：https://ross.hk/
-- 管理后台独立部署（不在本仓）
-- 备案号：湘ICP备2026033513号-1
+## 已上线小程序
 
-## 目录说明
+微信里扫码即可使用。
 
-| 路径 | 说明 |
-|------|------|
-| `index.html` / `video.html` | 页面入口 |
-| `css/` `js/` | 样式与前端逻辑 |
-| `images/` `covers/` `videos/` | 媒体资源 |
-| `server/` | 留言板等辅助服务脚本 |
-| `scripts/` / `tools/` | 构建与同步工具 |
-| `wechat_articles.json` | 微信文章本地镜像数据 |
+### 小猪语音账本
 
-## 本地预览
+按住说话，一句「午饭15」就是一笔账，也能打字录入。看明细、分类占比、本月收支和月供测算。账单只存本机，语音识别后不保存录音。
 
-```bash
-python -m http.server 8080
-```
+### 月薪到手对照
 
-浏览器访问 `http://127.0.0.1:8080/`。
+对照工资条，算清这个月真正能拿到手的钱。不登录、不联网、无广告。
 
-## 版本与数据
+- 月薪推演：税后每月能拿多少
+- 年终奖对照：两种计税只比税额差
+- Offer 对照：现金、年包、房租放一起看
 
-- 版本说明见 `VERSION.txt`（与服务器冻结版对齐）。
-- 业务数据库（SQLite 等）保存在服务器 `/opt/ross-cms/data/`，**不会**提交到本公开仓。
-- 换设备接手请从服务器拉取线上目录或冻结包 `/opt/ross-releases/CURRENT`，不要依赖本仓代替生产数据。
+按公开税率和个人社保公积金比例推演，仅供个人对照，不构成税务或职业建议。
 
-## License
+## 免费工具
 
-Private portfolio content. All rights reserved.
+两个本地优先的免费工具，在网站里新页面打开，可同屏 / 分屏使用。
+
+### 财务计算器
+
+等额本息 / 等额本金，逐期明细可导出核对。
+
+### 协作白板 · 无限画布
+
+便签、画笔、连线，即协作。
+
+## 站上还有
+
+AI 提示词、创意视觉、作品集、视频，以及设计与 AI 工作流笔记。合作与联系见 [ross.hk](https://ross.hk/#contact)。
+
+## English
+
+**Ross Studio** — design, AI, and writing. Site: [ross.hk](https://ross.hk/)
+
+### Mini programs
+
+Live on WeChat. Scan to open.
+
+**Piggy Voice Ledger.** Hold to talk — say “lunch 15” and it’s one entry. You can type too. See line items, category share, this month’s cash flow, and a mortgage estimate. Bills stay on this device. After speech is recognized, the recording is not kept.
+
+**Take-home Pay Check.** See what actually lands from your payslip. No login, offline, no ads.
+
+- Monthly pay: take-home after tax and socials
+- Year-end bonus: compares the two tax methods
+- Offer compare: cash, months, rent, side by side
+
+Uses public tax rates and local socials. Personal reference only — not tax or career advice.
+
+### Free tools
+
+Two local-first free tools—open in a new tab to use side-by-side.
+
+**Finance Calculator.** Equal installment or principal, per-period breakdown you can export.
+
+**Whiteboard · Infinite Canvas.** Notes, pen, links — live.

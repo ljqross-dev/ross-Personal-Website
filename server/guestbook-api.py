@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
 Ross 留言板 + 市场数据 API 服务 — 纯标准库实现
-监听 127.0.0.1:8888，提供：
+提供：
   - GET/POST /api/guestbook       留言板 CRUD
   - GET       /api/market         A 股实时市场总览（代理腾讯财经 qt.gtimg.cn）
   - GET       /api/health         健康检查
-数据存储：/var/lib/ross-data/guestbook.json
+数据目录、上传目录和端口只从环境变量读取。
 市场数据：内存缓存 90s，TTL 后异步刷新
 """
 
@@ -23,13 +23,19 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 # ---- 配置 ----
-DATA_DIR = "/var/lib/ross-data"
+def _need(name):
+    value = os.environ.get(name, "").strip()
+    if not value:
+        raise SystemExit(name + " missing")
+    return value
+
+DATA_DIR = _need("GUESTBOOK_DATA_DIR")
 DATA_FILE = os.path.join(DATA_DIR, "guestbook.json")
 CODES_FILE = os.path.join(DATA_DIR, "a_stock_codes.json")  # A 股代码缓存
-UPLOAD_DIR = "/usr/share/nginx/html/uploads/guestbook"
+UPLOAD_DIR = _need("GUESTBOOK_UPLOAD_DIR")
 UPLOAD_URL_PREFIX = "/uploads/guestbook"
 HOST = "127.0.0.1"
-PORT = 8888
+PORT = int(_need("GUESTBOOK_PORT"))
 MAX_MESSAGES = 200
 RATE_LIMIT = 5
 RATE_WINDOW = 60
